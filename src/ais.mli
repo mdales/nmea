@@ -1,4 +1,211 @@
+type navigation_status =
+    | Under_way_using_engine
+    | At_anchor
+    | Not_under_command
+    | Retricted_manoeuverability
+    | Constrained_by_her_draught
+    | Moored
+    | Aground
+    | Engaged_in_fishing
+    | Under_way_sailing
+    | Reserved_for_HSC
+    | Reserved_for_WIG
+    | Power_driven_vessel_towing_astern
+    | Power_driven_vessel_pushing_ahead
+    | Reserved
+    | AIS_SART_is_active
+    | Undefined
+    [@@deriving enum]
+
+type maneuver_indicator =
+    | Not_available
+    | No_special_maneuver
+    | Special_maneuver
+    [@@deriving enum]
+
+type time_stamp =
+    | Time_stamp of int
+    | Not_available
+    | Manual_mode
+    | Estimated_mode
+    | Inoperative
+
+type position_report = {
+    navigation_status : navigation_status;
+    rate_of_turn : int;
+    speed_over_ground: float option;
+    position_accuracy: bool;
+    location: Coord.t option;
+    course_over_ground: int option;
+    true_heading: int;
+    time_stamp: time_stamp;
+    maneuver_indicator: maneuver_indicator;
+    raim_flag : bool;
+    radio_status: int;
+}
+
+type position_fix_type =
+    | Undefined
+    | GPS
+    | GLONASS
+    | Combined_GPS_GLONASS
+    | Loran_c
+    | Chayka
+    | Integrated_navigation_system
+    | Surveyed
+    | Galileo
+    | Reserved_1
+    | Reserved_2
+    | Reserved_3
+    | Reserved_4
+    | Reserved_5
+    | Reserved_6
+    | Internal_GNSS
+    [@@deriving enum]
+
+type base_station_report = {
+    year: int option;
+    month: int option;
+    day: int option;
+    hour: int option;
+    minute: int option;
+    second: int option;
+    fix_quality: bool;
+    location: Coord.t option;
+    position_fix_type: position_fix_type;
+    raim_flag : bool;
+    radio_status: int;
+}
+
+type ship_and_cargo_classification =
+    | Not_available
+    | Reserved_1
+    | Reserved_2
+    | Reserved_3
+    | Reserved_4
+    | Reserved_5
+    | Reserved_6
+    | Reserved_7
+    | Reserved_8
+    | Reserved_9
+    | Reserved_10
+    | Reserved_11
+    | Reserved_12
+    | Reserved_13
+    | Reserved_14
+    | Reserved_15
+    | Reserved_16
+    | Reserved_17
+    | Reserved_18
+    | Reserved_19
+    | Wing_in_ground_all
+    | Wing_in_ground_hazardous_catagory_a
+    | Wing_in_ground_hazardous_catagory_b
+    | Wing_in_ground_hazardous_catagory_c
+    | Wing_in_ground_hazardous_catagory_d
+    | Wing_in_ground_reserved_1
+    | Wing_in_ground_reserved_2
+    | Wing_in_ground_reserved_3
+    | Wing_in_ground_reserved_4
+    | Wing_in_ground_reserved_5
+    | Fishing
+    | Towing
+    | Towing_large
+    | Dredging_or_underwater_ops
+    | Diving_ops
+    | Military_ops
+    | Sailing
+    | Pleasure_craft
+    | Reserved_39
+    | Reserved_40
+    | High_speed_craft_all
+    | High_speed_craft_hazardous_catagory_a
+    | High_speed_craft_hazardous_catagory_b
+    | High_speed_craft_hazardous_catagory_c
+    | High_speed_craft_hazardous_catagory_d
+    | High_speed_craft_reserved_1
+    | High_speed_craft_reserved_2
+    | High_speed_craft_reserved_3
+    | High_speed_craft_reserved_4
+    | High_speed_craft_no_additional_info
+    | Pilot_vessel
+    | Search_and_rescue_vessel
+    | Tug
+    | Port_tender
+    | Anti_pollution_equipment
+    | Law_enforcement
+    | Spare_local_vessel_1
+    | Spare_local_vessel_2
+    | Medical_transport
+    | Noncompatant_ship
+    | Passenger_all
+    | Passenger_hazardous_category_a
+    | Passenger_hazardous_category_b
+    | Passenger_hazardous_category_c
+    | Passenger_hazardous_category_d
+    | Passenger_reserved_1
+    | Passenger_reserved_2
+    | Passenger_reserved_3
+    | Passenger_reserved_4
+    | Passenger_no_additional_info
+    | Cargo_all
+    | Cargo_hazardous_category_a
+    | Cargo_hazardous_category_b
+    | Cargo_hazardous_category_c
+    | Cargo_hazardous_category_d
+    | Cargo_reserved_1
+    | Cargo_reserved_2
+    | Cargo_reserved_3
+    | Cargo_reserved_4
+    | Cargo_no_additional_info
+    | Tanker_all
+    | Tanker_hazardous_category_a
+    | Tanker_hazardous_category_b
+    | Tanker_hazardous_category_c
+    | Tanker_hazardous_category_d
+    | Tanker_reserved_1
+    | Tanker_reserved_2
+    | Tanker_reserved_3
+    | Tanker_reserved_4
+    | Tanker_no_additional_info
+    | Other_all
+    | Other_hazardous_category_a
+    | Other_hazardous_category_b
+    | Other_hazardous_category_c
+    | Other_hazardous_category_d
+    | Other_reserved_1
+    | Other_reserved_2
+    | Other_reserved_3
+    | Other_reserved_4
+    | Other_no_additional_info
+    [@@deriving enum]
+
+type ais_version =
+    | ITU1371
+    | Future_editions of int
+
+type static_and_voyage_related_data = {
+    ais_version: ais_version;
+    imo_number: int;
+    call_sign: string;
+    ship_name: string;
+    ship_type: ship_and_cargo_classification;
+    to_bow: int;
+    to_stern: int;
+    to_port: int;
+    to_starboard: int;
+    position_fix_type: position_fix_type;
+    eta_month: int option;
+    eta_day: int option;
+    eta_hour: int option;
+    eta_minute: int option;
+    draught: int;
+    destination: string;
+    dte: bool;
+}
+
 type message_type =
+    | Invalid (* enumerations start at 1 *)
     | Position_report_class_a
     | Position_report_class_a_assigned_schedule
     | Position_report_class_a_response_to_interrogation
@@ -28,29 +235,20 @@ type message_type =
     | Position_report_for_long_range_applications
     [@@deriving enum]
 
-type navigation_status =
-    | Under_way_using_engine
-    | At_anchor
-    | Not_under_command
-    | Retricted_manoeuverability
-    | Constrained_by_her_draught
-    | Moored
-    | Aground
-    | Engaged_in_fishing
-    | Under_way_sailing
-    | Reserved_for_HSC
-    | Reserved_for_WIG
-    | Power_driven_vessel_towing_astern
-    | Power_driven_vessel_pushing_ahead
-    | Reserved
-    | AIS_SART_is_active
-    | Undefined
-    [@@deriving enum]
-
+type message =
+    | Position_report_class_a of position_report
+    | Position_report_class_a_assigned_schedule of position_report
+    | Position_report_class_a_response_to_interrogation of position_report
+    | Base_station_report of base_station_report
+    | Static_and_voyage_related_data of static_and_voyage_related_data
 
 type t = {
     channel : Sentence.channel_t;
-    message : message_type;
+    repeat_indicator : int;
+    mmsi : int;
+    message : message;
 }
+
+val time_stamp_to_string: time_stamp -> string
 
 val of_sentences: Sentence.vdm list -> t
