@@ -15,13 +15,13 @@ type navigation_status =
     | Reserved
     | AIS_SART_is_active
     | Undefined
-    [@@deriving enum]
+    [@@deriving enum, show]
 
 type maneuver_indicator =
     | Not_available
     | No_special_maneuver
     | Special_maneuver
-    [@@deriving enum]
+    [@@deriving enum, show]
 
 type time_stamp =
     | Time_stamp of int
@@ -61,7 +61,7 @@ type position_fix_type =
     | Reserved_5
     | Reserved_6
     | Internal_GNSS
-    [@@deriving enum]
+    [@@deriving enum, show]
 
 type base_station_report = {
     year: int option;
@@ -178,7 +178,7 @@ type ship_and_cargo_classification =
     | Other_reserved_3
     | Other_reserved_4
     | Other_no_additional_info
-    [@@deriving enum]
+    [@@deriving enum, show]
 
 type ais_version =
     | ITU1371
@@ -233,7 +233,7 @@ type message_type =
     | Single_slot_binary_message
     | Multiple_slot_binary_message_with_communications_state
     | Position_report_for_long_range_applications
-    [@@deriving enum]
+    [@@deriving enum, show]
 
 type message =
     | Position_report_class_a of position_report
@@ -298,10 +298,21 @@ let get_bits payload _padding signed offset length =
 let get_text payload padding offset length =
     if (Int.rem length 6) <> 0 then invalid_arg "Expected length to be multiple of six";
     let char_count = Int.fdiv length 6 in
-    String.init char_count (fun i ->
+    let padded_string  = String.init char_count (fun i ->
         let v = get_bits payload padding Unsigned (offset + (i * 6)) 6 in
+        if v < 32 then Char.chr (v + 64) else
         Char.chr v
-    )
+    ) in
+    let rec loop i =
+        if i < 0 then 0 else (
+        let c = String.get padded_string i in
+        match c with
+        | '@' | ' ' -> loop (i - 1)
+        | _ -> i + 1
+        )
+    in
+    let final_pos = loop (char_count - 1) in
+    String.sub padded_string 0 final_pos
 
 let raw_lat_lng_to_coord longitude_raw latitude_raw =
     match longitude_raw, latitude_raw with

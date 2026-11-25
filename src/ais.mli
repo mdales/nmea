@@ -15,13 +15,13 @@ type navigation_status =
     | Reserved
     | AIS_SART_is_active
     | Undefined
-    [@@deriving enum]
+    [@@deriving enum, show]
 
 type maneuver_indicator =
     | Not_available
     | No_special_maneuver
     | Special_maneuver
-    [@@deriving enum]
+    [@@deriving enum, show]
 
 type time_stamp =
     | Time_stamp of int
@@ -61,7 +61,7 @@ type position_fix_type =
     | Reserved_5
     | Reserved_6
     | Internal_GNSS
-    [@@deriving enum]
+    [@@deriving enum, show]
 
 type base_station_report = {
     year: int option;
@@ -178,7 +178,7 @@ type ship_and_cargo_classification =
     | Other_reserved_3
     | Other_reserved_4
     | Other_no_additional_info
-    [@@deriving enum]
+    [@@deriving enum, show]
 
 type ais_version =
     | ITU1371
@@ -233,7 +233,7 @@ type message_type =
     | Single_slot_binary_message
     | Multiple_slot_binary_message_with_communications_state
     | Position_report_for_long_range_applications
-    [@@deriving enum]
+    [@@deriving enum, show]
 
 type message =
     | Position_report_class_a of position_report

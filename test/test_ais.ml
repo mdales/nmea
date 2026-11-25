@@ -97,6 +97,7 @@ let test_simple_base_station_message _ =
             assert_equal ~printer:fmt_opt_int ~msg:"Check second" (Some 19) msg.second;
             assert_equal ~printer:Bool.to_string ~msg:"Check fix quality" false msg.fix_quality;
             assert_equal ~cmp:cmp_opt_loc ~printer:fmt_opt_loc ~msg:"Check location" (Some ((53.465817, Coord.N), (3.040915, Coord.W))) msg.location;
+            assert_equal ~printer:Bool.to_string ~msg:"Check raim flag" false msg.raim_flag;
         )
         | _ -> assert false
     )
@@ -124,9 +125,31 @@ let test_related_data_message _ =
 
         let ais = Ais.of_sentences ([pkt1 ; pkt2]) in
         assert_equal ~msg:"Check channel" Sentence.A ais.channel;
-        (* assert_equal ~printer:print_msg_type ~msg:"Check message" Ais.Static_and_voyage_related_data ais.message; *)
         assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
         assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 232066995 ais.mmsi;
+
+        match ais.message with
+        | Static_and_voyage_related_data msg -> (
+            assert_equal ~msg:"Check ais version" (Ais.Future_editions 2) msg.ais_version;
+            assert_equal ~printer:Int.to_string ~msg:"Check imo number" 1020306 msg.imo_number;
+            assert_equal ~printer:(fun s -> s) ~msg:"Check call sign" "MTN09" msg.call_sign;
+            assert_equal ~printer:(fun s -> s) ~msg:"Check ship name" "CT BIDSTON" msg.ship_name;
+            assert_equal ~printer:Ais.show_ship_and_cargo_classification ~msg:"Check ship classification" Ais.Reserved_19 msg.ship_type;
+            assert_equal ~printer:Int.to_string ~msg:"Check to_bow" 12 msg.to_bow;
+            assert_equal ~printer:Int.to_string ~msg:"Check to_stern" 12 msg.to_stern;
+            assert_equal ~printer:Int.to_string ~msg:"Check to_port" 5 msg.to_port;
+            assert_equal ~printer:Int.to_string ~msg:"Check to_starboard" 7 msg.to_starboard;
+            assert_equal ~printer:Ais.show_position_fix_type ~msg:"Check position fix type" Ais.GPS msg.position_fix_type;
+            assert_equal ~printer:fmt_opt_int ~msg:"Check ETA month" (Some 11) msg.eta_month;
+            assert_equal ~printer:fmt_opt_int ~msg:"Check ETA day" (Some 23) msg.eta_day;
+            assert_equal ~printer:fmt_opt_int ~msg:"Check ETA hour" (Some 17) msg.eta_hour;
+            assert_equal ~printer:fmt_opt_int ~msg:"Check ETA minute" (Some 30) msg.eta_minute;
+            assert_equal ~printer:Int.to_string ~msg:"Check draught" 200 msg.draught;
+            assert_equal ~printer:(fun s -> s) ~msg:"Check destination" "LIVERPOOL" msg.destination;
+            assert_equal ~printer:Bool.to_string ~msg:"Check DTE" false msg.dte;
+
+        )
+        | _ -> assert false
     )
     | _ -> assert false
 
