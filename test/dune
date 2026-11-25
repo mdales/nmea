@@ -1,8 +1,10 @@
-(test
- (name test)
+(tests
+ (names
+    test_nmea
+    test_ais
+ )
  (deps data.txt)
- (libraries oUnit nmea)
- (modules ("test")))
+ (libraries oUnit nmea))
 
 (env
   (dev

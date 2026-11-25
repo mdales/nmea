@@ -1,8 +1,9 @@
 (library
  (public_name nmea)
  (name nmea)
- (libraries unix)
- (modules ("coord" "parse" "sentence" "parser" "lexer")))
+ (libraries unix ppx_deriving)
+ (preprocess (pps ppx_deriving.enum))
+ (modules ("coord" "parse" "sentence" "parser" "lexer" "ais")))
 
 (ocamllex lexer)
 
