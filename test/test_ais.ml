@@ -14,6 +14,11 @@ let fmt_opt_int i =
     | None -> "None"
     | Some i -> Int.to_string i
 
+let fmt_opt_float x =
+    match x with
+    | None -> "None"
+    | Some x -> Float.to_string x
+
 let cmp_opt_loc a b =
     match a, b with
     | None, None -> true
@@ -40,6 +45,8 @@ let test_simple_positon_message _ =
             assert_equal ~printer:fmt_nav_type ~msg:"Check navigation status" Ais.Under_way_using_engine msg.navigation_status;
             assert_equal ~printer:Ais.time_stamp_to_string ~msg:"Check time stamp" (Ais.Time_stamp 24) msg.time_stamp;
             assert_equal ~cmp:cmp_opt_loc ~printer:fmt_opt_loc ~msg:"Check location" (Some ((53.322223, Coord.N), (3.262000, Coord.W))) msg.location;
+            assert_equal ~printer:fmt_opt_float ~msg:"Check speed" (Some 0.) msg.speed_over_ground;
+            assert_equal ~printer:fmt_opt_float ~msg:"Check direction" (Some 317.8) msg.course_over_ground;
         )
         | _ -> assert false
     )
@@ -65,11 +72,12 @@ let test_simple_positon_message_synthetic _ =
             assert_equal ~printer:fmt_nav_type ~msg:"Check navigation status" Ais.Under_way_using_engine msg.navigation_status;
             assert_equal ~msg:"Check time stamp" (Ais.Not_available : Ais.time_stamp) msg.time_stamp;
             assert_equal ~cmp:cmp_opt_loc ~printer:fmt_opt_loc ~msg:"Check location" (Some ((53.45, Coord.N), (3.02, Coord.W))) msg.location;
+            assert_equal ~printer:fmt_opt_float ~msg:"Check speed" (Some 0.) msg.speed_over_ground;
+            assert_equal ~printer:fmt_opt_float ~msg:"Check direction" None msg.course_over_ground;
         )
         | _ -> assert false
     )
     | _ -> assert false
-
 
 let test_simple_base_station_message _ =
     let msg = "!AIVDM,1,1,,A,402=ahQvbt`kCOj56nNUvPW008;f,0*1A" in
@@ -153,6 +161,63 @@ let test_related_data_message _ =
     )
     | _ -> assert false
 
+
+let test_simple_sar_aircraft_message_synthetic _ =
+    let msg = "!AIVDM,1,1,,A,91b540AhQOwhKr0NW>`:S7P20000,0*27" in
+    match Nmea.Parse.parse msg with
+    | VDM vdm -> (
+        assert_equal ~msg:"Check fragment" 1 vdm.fragment;
+        assert_equal ~msg:"Check fragmens" 1 vdm.fragments;
+        assert_equal ~msg:"Check id" None vdm.id;
+        assert_equal ~msg:"Check channel" Sentence.A vdm.channel;
+        assert_equal ~msg:"Check padding" 0 vdm.padding;
+
+        let ais = Ais.of_sentences ([vdm]) in
+        assert_equal ~msg:"Check channel" Sentence.A ais.channel;
+        assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
+        assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 111232001 ais.mmsi;
+
+        match ais.message with
+        | Standard_SAR_aircraft_position_report msg -> (
+            assert_equal ~msg:"Check time stamp" (Ais.Time_stamp 30 : Ais.time_stamp) msg.time_stamp;
+            assert_equal ~cmp:cmp_opt_loc ~printer:fmt_opt_loc ~msg:"Check location" (Some ((53.5000, Coord.N), (3.4, Coord.W))) msg.location;
+            assert_equal ~printer:fmt_opt_float ~msg:"Check speed" (Some 95.) msg.speed_over_ground;
+            assert_equal ~printer:fmt_opt_float ~msg:"Check direction" (Some 270.) msg.course_over_ground;
+            assert_equal ~printer:fmt_opt_int ~msg:"Check altitude" (Some 450) msg.altitude;
+        )
+        | _ -> assert false
+    )
+    | _ -> assert false
+
+
+
+let test_simple_sar_aircraft_message_sentinel_synthetic _ =
+    let msg = "!AIVDM,1,1,,A,91b540OwwwwhKr0NW>`>4?020000,0*23" in
+    match Nmea.Parse.parse msg with
+    | VDM vdm -> (
+        assert_equal ~msg:"Check fragment" 1 vdm.fragment;
+        assert_equal ~msg:"Check fragmens" 1 vdm.fragments;
+        assert_equal ~msg:"Check id" None vdm.id;
+        assert_equal ~msg:"Check channel" Sentence.A vdm.channel;
+        assert_equal ~msg:"Check padding" 0 vdm.padding;
+
+        let ais = Ais.of_sentences ([vdm]) in
+        assert_equal ~msg:"Check channel" Sentence.A ais.channel;
+        assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
+        assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 111232001 ais.mmsi;
+
+        match ais.message with
+        | Standard_SAR_aircraft_position_report msg -> (
+            assert_equal ~msg:"Check time stamp" (Ais.Not_available : Ais.time_stamp) msg.time_stamp;
+            assert_equal ~cmp:cmp_opt_loc ~printer:fmt_opt_loc ~msg:"Check location" (Some ((53.5000, Coord.N), (3.4, Coord.W))) msg.location;
+            assert_equal ~printer:fmt_opt_float ~msg:"Check speed" None msg.speed_over_ground;
+            assert_equal ~printer:fmt_opt_float ~msg:"Check direction" None msg.course_over_ground;
+            assert_equal ~printer:fmt_opt_int ~msg:"Check altitude" None msg.altitude;
+        )
+        | _ -> assert false
+    )
+    | _ -> assert false
+
 let suite =
   "ais tests"
   >::: [
@@ -160,6 +225,8 @@ let suite =
          "Test position message synthetic" >:: test_simple_positon_message_synthetic;
          "Test base station message" >:: test_simple_base_station_message;
          "Test related data message" >:: test_related_data_message;
+         "Test SAR synthetic" >:: test_simple_sar_aircraft_message_synthetic;
+         "Test SAR sentinel" >:: test_simple_sar_aircraft_message_sentinel_synthetic;
        ]
 
 let () = run_test_tt_main suite

@@ -1,3 +1,5 @@
+exception Incomplete_message
+
 type navigation_status =
     | Under_way_using_engine
     | At_anchor
@@ -36,7 +38,7 @@ type position_report = {
     speed_over_ground: float option;
     position_accuracy: bool;
     location: Coord.t option;
-    course_over_ground: int option;
+    course_over_ground: float option;
     true_heading: int option;
     time_stamp: time_stamp;
     maneuver_indicator: maneuver_indicator;
@@ -99,10 +101,10 @@ type ship_and_cargo_classification =
     | Reserved_18
     | Reserved_19
     | Wing_in_ground_all
-    | Wing_in_ground_hazardous_catagory_a
-    | Wing_in_ground_hazardous_catagory_b
-    | Wing_in_ground_hazardous_catagory_c
-    | Wing_in_ground_hazardous_catagory_d
+    | Wing_in_ground_hazardous_category_a
+    | Wing_in_ground_hazardous_category_b
+    | Wing_in_ground_hazardous_category_c
+    | Wing_in_ground_hazardous_category_d
     | Wing_in_ground_reserved_1
     | Wing_in_ground_reserved_2
     | Wing_in_ground_reserved_3
@@ -119,10 +121,10 @@ type ship_and_cargo_classification =
     | Reserved_39
     | Reserved_40
     | High_speed_craft_all
-    | High_speed_craft_hazardous_catagory_a
-    | High_speed_craft_hazardous_catagory_b
-    | High_speed_craft_hazardous_catagory_c
-    | High_speed_craft_hazardous_catagory_d
+    | High_speed_craft_hazardous_category_a
+    | High_speed_craft_hazardous_category_b
+    | High_speed_craft_hazardous_category_c
+    | High_speed_craft_hazardous_category_d
     | High_speed_craft_reserved_1
     | High_speed_craft_reserved_2
     | High_speed_craft_reserved_3
@@ -204,6 +206,19 @@ type static_and_voyage_related_data = {
     dte: bool;
 }
 
+type standard_sar_aircraft_position_report = {
+    altitude: int option;
+    speed_over_ground: float option;
+    position_accuracy: bool;
+    location: Coord.t option;
+    course_over_ground: float option;
+    time_stamp: time_stamp;
+    dte: bool;
+    assigned: bool;
+    raim_flag : bool;
+    radio_status: int;
+}
+
 type message_type =
     | Invalid (* enumerations start at 1 *)
     | Position_report_class_a
@@ -214,7 +229,7 @@ type message_type =
     | Binary_addressed_message
     | Binary_acknowledge
     | Binary_broadcast_message
-    | Standard_SAR_aircrart_position_report
+    | Standard_SAR_aircraft_position_report
     | UTC_and_date_inquiry
     | UTC_and_date_response
     | Addressed_safety_related_message
@@ -241,6 +256,7 @@ type message =
     | Position_report_class_a_response_to_interrogation of position_report
     | Base_station_report of base_station_report
     | Static_and_voyage_related_data of static_and_voyage_related_data
+    | Standard_SAR_aircraft_position_report of standard_sar_aircraft_position_report
     | Unprocessed of message_type
 
 type t = {

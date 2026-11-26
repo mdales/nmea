@@ -1,3 +1,5 @@
+exception Incomplete_message
+
 type navigation_status =
     | Under_way_using_engine
     | At_anchor
@@ -36,7 +38,7 @@ type position_report = {
     speed_over_ground: float option;
     position_accuracy: bool;
     location: Coord.t option;
-    course_over_ground: int option;
+    course_over_ground: float option;
     true_heading: int option;
     time_stamp: time_stamp;
     maneuver_indicator: maneuver_indicator;
@@ -99,10 +101,10 @@ type ship_and_cargo_classification =
     | Reserved_18
     | Reserved_19
     | Wing_in_ground_all
-    | Wing_in_ground_hazardous_catagory_a
-    | Wing_in_ground_hazardous_catagory_b
-    | Wing_in_ground_hazardous_catagory_c
-    | Wing_in_ground_hazardous_catagory_d
+    | Wing_in_ground_hazardous_category_a
+    | Wing_in_ground_hazardous_category_b
+    | Wing_in_ground_hazardous_category_c
+    | Wing_in_ground_hazardous_category_d
     | Wing_in_ground_reserved_1
     | Wing_in_ground_reserved_2
     | Wing_in_ground_reserved_3
@@ -119,10 +121,10 @@ type ship_and_cargo_classification =
     | Reserved_39
     | Reserved_40
     | High_speed_craft_all
-    | High_speed_craft_hazardous_catagory_a
-    | High_speed_craft_hazardous_catagory_b
-    | High_speed_craft_hazardous_catagory_c
-    | High_speed_craft_hazardous_catagory_d
+    | High_speed_craft_hazardous_category_a
+    | High_speed_craft_hazardous_category_b
+    | High_speed_craft_hazardous_category_c
+    | High_speed_craft_hazardous_category_d
     | High_speed_craft_reserved_1
     | High_speed_craft_reserved_2
     | High_speed_craft_reserved_3
@@ -204,6 +206,20 @@ type static_and_voyage_related_data = {
     dte: bool;
 }
 
+type standard_sar_aircraft_position_report = {
+    altitude: int option;
+    speed_over_ground: float option;
+    position_accuracy: bool;
+    location: Coord.t option;
+    course_over_ground: float option;
+    time_stamp: time_stamp;
+    dte: bool;
+    assigned: bool;
+    raim_flag : bool;
+    radio_status: int;
+}
+
+
 type message_type =
     | Invalid (* enumerations start at 1 *)
     | Position_report_class_a
@@ -214,7 +230,7 @@ type message_type =
     | Binary_addressed_message
     | Binary_acknowledge
     | Binary_broadcast_message
-    | Standard_SAR_aircrart_position_report
+    | Standard_SAR_aircraft_position_report
     | UTC_and_date_inquiry
     | UTC_and_date_response
     | Addressed_safety_related_message
@@ -241,6 +257,7 @@ type message =
     | Position_report_class_a_response_to_interrogation of position_report
     | Base_station_report of base_station_report
     | Static_and_voyage_related_data of static_and_voyage_related_data
+    | Standard_SAR_aircraft_position_report of standard_sar_aircraft_position_report
     | Unprocessed of message_type
 
 type t = {
@@ -351,7 +368,7 @@ let decoode_position_report payload padding =
 
     let course_over_ground = match course_over_ground_raw with
     | 0xE10 -> None
-    | x -> Some x
+    | x -> Some ((float_of_int x) /. 10.)
     in
 
     let true_heading = match true_heading_raw with
@@ -530,6 +547,61 @@ let decode_related_data payload padding =
     }
 
 
+let decoode_standard_sar_aircraft_report payload padding =
+    let get_bits = get_bits payload padding in
+    let altitude_raw = get_bits Unsigned 38 12 in
+    let speed_over_ground_raw = get_bits Unsigned 50 10 in
+    let position_accuracy = match (get_bits Unsigned 60 1) with 1 -> true | _ -> false in
+    let longitude_raw = get_bits Signed 61 28 in
+    let latitude_raw = get_bits Signed 89 27 in
+    let course_over_ground_raw = get_bits Unsigned 116 12 in
+    let time_stamp_raw = get_bits Unsigned 128 6 in
+    let dte = match (get_bits Unsigned 142 1) with 1 -> true | _ -> false in
+    let assigned = match (get_bits Unsigned 146 1) with 1 -> true | _ -> false in
+
+    let raim_flag = match (get_bits Unsigned 148 1) with 1 -> true | _ -> false in
+    let radio_status = get_bits Unsigned 149 19 in
+
+    let altitude = match altitude_raw with
+    | 4095 -> None
+    | x -> Some x
+    in
+
+    let speed_over_ground = match speed_over_ground_raw with
+    | 1023 -> None
+    | x -> Some (float_of_int x)
+    in
+
+    let location = raw_lat_lng_to_coord longitude_raw latitude_raw in
+
+    let course_over_ground = match course_over_ground_raw with
+    | 0xE10 -> None
+    | x -> Some ((float_of_int x) /. 10.)
+    in
+
+    let time_stamp = match time_stamp_raw with
+    | n when n < 0 -> invalid_arg "Failed to decode time stamp"
+    | n when n < 60 -> Time_stamp n
+    | 60 -> Not_available
+    | 61 -> Manual_mode
+    | 62 -> Estimated_mode
+    | 63 -> Inoperative
+    | _ -> invalid_arg "Invalid timestamp value"
+    in
+
+    {
+        altitude;
+        speed_over_ground;
+        position_accuracy;
+        location;
+        course_over_ground;
+        time_stamp;
+        dte;
+        assigned;
+        raim_flag;
+        radio_status;
+    }
+
 let time_stamp_to_string t =
     match t with
     | Time_stamp n -> Printf.sprintf "%d" n
@@ -547,12 +619,14 @@ let of_sentences sl  =
         let leng = List.length sl in
         let rec ordered expected = function
         | [] -> true
-        | ihd :: itl -> (ihd.Sentence.fragment = expected) &&
-            (ihd.fragments = leng) &&
+        | ihd :: itl -> (
+            if ihd.Sentence.fragments != leng then raise Incomplete_message;
+            (ihd.Sentence.fragment = expected) &&
             (ihd.channel = hd.channel) &&
-            ordered (expected + 1) itl
+            ordered (expected + 1) itl)
         in
-        if not (ordered 1 sl) then invalid_arg "Invalid sequence of sentences";
+        let err = String.concat " " (List.map (fun msg -> Printf.sprintf "%d/%d" msg.Sentence.fragment msg.fragments) sl) in
+        if not (ordered 1 sl) then invalid_arg ("Invalid sequence of sentences" ^ err);
 
         let payloads = List.map (fun a -> a.Sentence.payload) sl |> String.concat "" in
         let padding = List.fold_left (fun _ a -> a.Sentence.padding) 0 sl in
@@ -571,6 +645,7 @@ let of_sentences sl  =
             | Position_report_class_a_response_to_interrogation -> Position_report_class_a_response_to_interrogation (decoode_position_report binary_payload padding)
             | Base_station_report -> Base_station_report (decode_base_station_report binary_payload padding)
             | Static_and_voyage_related_data -> Static_and_voyage_related_data (decode_related_data binary_payload padding)
+            | Standard_SAR_aircraft_position_report -> Standard_SAR_aircraft_position_report (decoode_standard_sar_aircraft_report binary_payload padding)
             | mt -> Unprocessed mt
         )
         in
