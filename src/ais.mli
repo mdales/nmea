@@ -37,7 +37,7 @@ type position_report = {
     position_accuracy: bool;
     location: Coord.t option;
     course_over_ground: int option;
-    true_heading: int;
+    true_heading: int option;
     time_stamp: time_stamp;
     maneuver_indicator: maneuver_indicator;
     raim_flag : bool;
@@ -241,6 +241,7 @@ type message =
     | Position_report_class_a_response_to_interrogation of position_report
     | Base_station_report of base_station_report
     | Static_and_voyage_related_data of static_and_voyage_related_data
+    | Unprocessed of message_type
 
 type t = {
     channel : Sentence.channel_t;

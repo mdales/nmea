@@ -37,7 +37,7 @@ type position_report = {
     position_accuracy: bool;
     location: Coord.t option;
     course_over_ground: int option;
-    true_heading: int;
+    true_heading: int option;
     time_stamp: time_stamp;
     maneuver_indicator: maneuver_indicator;
     raim_flag : bool;
@@ -241,6 +241,7 @@ type message =
     | Position_report_class_a_response_to_interrogation of position_report
     | Base_station_report of base_station_report
     | Static_and_voyage_related_data of static_and_voyage_related_data
+    | Unprocessed of message_type
 
 type t = {
     channel : Sentence.channel_t;
@@ -335,7 +336,7 @@ let decoode_position_report payload padding =
     let longitude_raw = get_bits Signed 61 28 in
     let latitude_raw = get_bits Signed 89 27 in
     let course_over_ground_raw = get_bits Unsigned 116 12 in
-    let true_heading = get_bits Unsigned 128 9 in
+    let true_heading_raw = get_bits Unsigned 128 9 in
     let time_stamp_raw = get_bits Unsigned 137 6 in
     let maneuver_indicator = Option.get(maneuver_indicator_of_enum (get_bits Unsigned 143 2)) in
     let raim_flag = match (get_bits Unsigned 148 1) with 1 -> true | _ -> false in
@@ -350,6 +351,11 @@ let decoode_position_report payload padding =
 
     let course_over_ground = match course_over_ground_raw with
     | 0xE10 -> None
+    | x -> Some x
+    in
+
+    let true_heading = match true_heading_raw with
+    | 511 -> None
     | x -> Some x
     in
 
@@ -565,7 +571,7 @@ let of_sentences sl  =
             | Position_report_class_a_response_to_interrogation -> Position_report_class_a_response_to_interrogation (decoode_position_report binary_payload padding)
             | Base_station_report -> Base_station_report (decode_base_station_report binary_payload padding)
             | Static_and_voyage_related_data -> Static_and_voyage_related_data (decode_related_data binary_payload padding)
-            | _ -> failwith "todo"
+            | mt -> Unprocessed mt
         )
         in
 
