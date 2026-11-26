@@ -219,6 +219,27 @@ type standard_sar_aircraft_position_report = {
     radio_status: int;
 }
 
+type cs_unit =
+    | Class_B_SOTDMA
+    | Class_B_CS
+
+type standard_class_b_cs_position_report = {
+    speed_over_ground: float option;
+    position_accuracy: bool;
+    location: Coord.t option;
+    course_over_ground: float option;
+    true_heading: int option;
+    time_stamp: time_stamp;
+    cs_unit: cs_unit;
+    display_flag: bool;
+    dsc_flag: bool;
+    band_flag: bool;
+    message_22_flag: bool;
+    assigned: bool;
+    raim_flag : bool;
+    radio_status: int;
+}
+
 type message_type =
     | Invalid (* enumerations start at 1 *)
     | Position_report_class_a

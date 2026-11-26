@@ -218,6 +218,9 @@ let test_simple_sar_aircraft_message_sentinel_synthetic _ =
     )
     | _ -> assert false
 
+(* !AIVDM,1,1,,B,B3P7@hP0?wtMc`7`vs0mLe7UWP06,0*4C
+!AIVDM,1,1,,B,B3P7@hP3wwtMc`7`vs3Q3wv5WP06,0*74 *)
+
 let suite =
   "ais tests"
   >::: [
