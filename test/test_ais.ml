@@ -161,7 +161,6 @@ let test_related_data_message _ =
     )
     | _ -> assert false
 
-
 let test_simple_sar_aircraft_message_synthetic _ =
     let msg = "!AIVDM,1,1,,A,91b540AhQOwhKr0NW>`:S7P20000,0*27" in
     match Nmea.Parse.parse msg with
@@ -188,8 +187,6 @@ let test_simple_sar_aircraft_message_synthetic _ =
         | _ -> assert false
     )
     | _ -> assert false
-
-
 
 let test_simple_sar_aircraft_message_sentinel_synthetic _ =
     let msg = "!AIVDM,1,1,,A,91b540OwwwwhKr0NW>`>4?020000,0*23" in
@@ -218,8 +215,61 @@ let test_simple_sar_aircraft_message_sentinel_synthetic _ =
     )
     | _ -> assert false
 
-(* !AIVDM,1,1,,B,B3P7@hP0?wtMc`7`vs0mLe7UWP06,0*4C
-!AIVDM,1,1,,B,B3P7@hP3wwtMc`7`vs3Q3wv5WP06,0*74 *)
+
+
+let test_simple_class_b_cs_position_report_message_synthetic _ =
+  let msg = "!AIVDM,1,1,,B,B3P7@hP0?wtMc`7`vs0mLe7UWP06,0*4C" in
+  match Nmea.Parse.parse msg with
+  | VDM vdm -> (
+      assert_equal ~msg:"Check fragment" 1 vdm.fragment;
+      assert_equal ~msg:"Check fragmens" 1 vdm.fragments;
+      assert_equal ~msg:"Check id" None vdm.id;
+      assert_equal ~msg:"Check channel" Sentence.B vdm.channel;
+      assert_equal ~msg:"Check padding" 0 vdm.padding;
+
+      let ais = Ais.of_sentences ([vdm]) in
+      assert_equal ~msg:"Check channel" Sentence.B ais.channel;
+      assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
+      assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 235000002 ais.mmsi;
+
+      match ais.message with
+      | Standard_class_b_CS_position_report msg -> (
+          assert_equal ~msg:"Check time stamp" (Ais.Time_stamp 15 : Ais.time_stamp) msg.time_stamp;
+          assert_equal ~cmp:cmp_opt_loc ~printer:fmt_opt_loc ~msg:"Check location" (Some ((53.4100, Coord.N), (3.09, Coord.W))) msg.location;
+          assert_equal ~printer:fmt_opt_float ~msg:"Check speed" (Some 6.3) msg.speed_over_ground;
+          assert_equal ~printer:fmt_opt_float ~msg:"Check direction" (Some 85.5) msg.course_over_ground;
+          assert_equal ~printer:fmt_opt_int ~msg:"Check heading" (Some 90) msg.true_heading;
+      )
+      | _ -> assert false
+  )
+  | _ -> assert false
+
+let test_simple_class_b_cs_position_report_message_sentinel_synthetic _ =
+  let msg = "!AIVDM,1,1,,B,B3P7@hP3wwtMc`7`vs3Q3wv5WP06,0*74" in
+  match Nmea.Parse.parse msg with
+  | VDM vdm -> (
+      assert_equal ~msg:"Check fragment" 1 vdm.fragment;
+      assert_equal ~msg:"Check fragmens" 1 vdm.fragments;
+      assert_equal ~msg:"Check id" None vdm.id;
+      assert_equal ~msg:"Check channel" Sentence.B vdm.channel;
+      assert_equal ~msg:"Check padding" 0 vdm.padding;
+
+      let ais = Ais.of_sentences ([vdm]) in
+      assert_equal ~msg:"Check channel" Sentence.B ais.channel;
+      assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
+      assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 235000002 ais.mmsi;
+
+      match ais.message with
+      | Standard_class_b_CS_position_report msg -> (
+          assert_equal ~msg:"Check time stamp" (Ais.Not_available : Ais.time_stamp) msg.time_stamp;
+          assert_equal ~cmp:cmp_opt_loc ~printer:fmt_opt_loc ~msg:"Check location" (Some ((53.4100, Coord.N), (3.09, Coord.W))) msg.location;
+          assert_equal ~printer:fmt_opt_float ~msg:"Check speed" None msg.speed_over_ground;
+          assert_equal ~printer:fmt_opt_float ~msg:"Check direction" None msg.course_over_ground;
+          assert_equal ~printer:fmt_opt_int ~msg:"Check heading" None msg.true_heading;
+      )
+      | _ -> assert false
+  )
+  | _ -> assert false
 
 let suite =
   "ais tests"
@@ -230,6 +280,8 @@ let suite =
          "Test related data message" >:: test_related_data_message;
          "Test SAR synthetic" >:: test_simple_sar_aircraft_message_synthetic;
          "Test SAR sentinel" >:: test_simple_sar_aircraft_message_sentinel_synthetic;
+         "Test Class B CS report synthetic" >:: test_simple_class_b_cs_position_report_message_synthetic;
+          "Test Class B CS report sentinel synthetic" >:: test_simple_class_b_cs_position_report_message_sentinel_synthetic;
        ]
 
 let () = run_test_tt_main suite

@@ -278,6 +278,7 @@ type message =
     | Base_station_report of base_station_report
     | Static_and_voyage_related_data of static_and_voyage_related_data
     | Standard_SAR_aircraft_position_report of standard_sar_aircraft_position_report
+    | Standard_class_b_CS_position_report of standard_class_b_cs_position_report
     | Unprocessed of message_type
 
 type t = {

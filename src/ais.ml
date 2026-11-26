@@ -219,6 +219,26 @@ type standard_sar_aircraft_position_report = {
     radio_status: int;
 }
 
+type cs_unit =
+    | Class_B_SOTDMA
+    | Class_B_CS
+
+type standard_class_b_cs_position_report = {
+    speed_over_ground: float option;
+    position_accuracy: bool;
+    location: Coord.t option;
+    course_over_ground: float option;
+    true_heading: int option;
+    time_stamp: time_stamp;
+    cs_unit: cs_unit;
+    display_flag: bool;
+    dsc_flag: bool;
+    band_flag: bool;
+    message_22_flag: bool;
+    assigned: bool;
+    raim_flag : bool;
+    radio_status: int;
+}
 
 type message_type =
     | Invalid (* enumerations start at 1 *)
@@ -258,6 +278,7 @@ type message =
     | Base_station_report of base_station_report
     | Static_and_voyage_related_data of static_and_voyage_related_data
     | Standard_SAR_aircraft_position_report of standard_sar_aircraft_position_report
+    | Standard_class_b_CS_position_report of standard_class_b_cs_position_report
     | Unprocessed of message_type
 
 type t = {
@@ -602,6 +623,70 @@ let decoode_standard_sar_aircraft_report payload padding =
         radio_status;
     }
 
+let decoode_class_b_cs_position_report payload padding =
+    let get_bits = get_bits payload padding in
+    let speed_over_ground_raw = get_bits Unsigned 46 10 in
+    let position_accuracy = match (get_bits Unsigned 56 1) with 1 -> true | _ -> false in
+    let longitude_raw = get_bits Signed 57 28 in
+    let latitude_raw = get_bits Signed 85 27 in
+    let course_over_ground_raw = get_bits Unsigned 112 12 in
+    let true_heading_raw = get_bits Unsigned 124 9 in
+    let time_stamp_raw = get_bits Unsigned 133 6 in
+    let cs_unit = match (get_bits Unsigned 141 1) with 1 -> Class_B_CS | _ -> Class_B_SOTDMA in
+    let display_flag = match (get_bits Unsigned 142 1) with 1 -> true | _ -> false in
+    let dsc_flag = match (get_bits Unsigned 143 1) with 1 -> true | _ -> false in
+    let band_flag = match (get_bits Unsigned 144 1) with 1 -> true | _ -> false in
+    let message_22_flag = match (get_bits Unsigned 145 1) with 1 -> true | _ -> false in
+    let assigned = match (get_bits Unsigned 146 1) with 1 -> true | _ -> false in
+
+
+    let raim_flag = match (get_bits Unsigned 147 1) with 1 -> true | _ -> false in
+    let radio_status = get_bits Unsigned 148 20 in
+
+    let speed_over_ground = match speed_over_ground_raw with
+    | 1023 -> None
+    | x -> Some ((float_of_int x) /. 10.)
+    in
+
+    let location = raw_lat_lng_to_coord longitude_raw latitude_raw in
+
+    let course_over_ground = match course_over_ground_raw with
+    | 0xE10 -> None
+    | x -> Some ((float_of_int x) /. 10.)
+    in
+
+    let true_heading = match true_heading_raw with
+    | 511 -> None
+    | x -> Some x
+    in
+
+    let time_stamp = match time_stamp_raw with
+    | n when n < 0 -> invalid_arg "Failed to decode time stamp"
+    | n when n < 60 -> Time_stamp n
+    | 60 -> Not_available
+    | 61 -> Manual_mode
+    | 62 -> Estimated_mode
+    | 63 -> Inoperative
+    | _ -> invalid_arg "Invalid timestamp value"
+    in
+
+    {
+        speed_over_ground;
+        position_accuracy;
+        location;
+        course_over_ground;
+        true_heading;
+        time_stamp;
+        cs_unit;
+        display_flag;
+        dsc_flag;
+        band_flag;
+        message_22_flag;
+        assigned;
+        raim_flag;
+        radio_status;
+    }
+
 let time_stamp_to_string t =
     match t with
     | Time_stamp n -> Printf.sprintf "%d" n
@@ -646,6 +731,7 @@ let of_sentences sl  =
             | Base_station_report -> Base_station_report (decode_base_station_report binary_payload padding)
             | Static_and_voyage_related_data -> Static_and_voyage_related_data (decode_related_data binary_payload padding)
             | Standard_SAR_aircraft_position_report -> Standard_SAR_aircraft_position_report (decoode_standard_sar_aircraft_report binary_payload padding)
+            | Standard_class_b_CS_position_report -> Standard_class_b_CS_position_report (decoode_class_b_cs_position_report binary_payload padding)
             | mt -> Unprocessed mt
         )
         in
