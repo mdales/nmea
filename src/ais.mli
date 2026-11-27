@@ -219,10 +219,25 @@ type standard_sar_aircraft_position_report = {
     radio_status: int;
 }
 
+(* Type 15 *)
+type ais_interrogation = {
+    first_interrogated_mmsi: int;
+    first_message_type: int;
+    first_slot_offset: int;
+    second_message_type: int;
+    second_slot_offset: int;
+
+    second_interrogated_mmsi: int;
+    third_message_type: int;
+    third_slot_offset: int;
+}
+
+
 type cs_unit =
     | Class_B_SOTDMA
     | Class_B_CS
 
+(* Type 18 *)
 type standard_class_b_cs_position_report = {
     speed_over_ground: float option;
     position_accuracy: bool;
@@ -238,6 +253,59 @@ type standard_class_b_cs_position_report = {
     assigned: bool;
     raim_flag : bool;
     radio_status: int;
+}
+
+type aid_type =
+    | Unspecified
+    | Reference_point
+    | RACON
+    | Fixed_structure
+    | Reserved
+    | Light_without_sectors
+    | Light_with_sectors
+    | Leading_light_from
+    | Leading_light_rear
+    | Beacon_N
+    | Beacon_E
+    | Beacon_S
+    | Beacon_W
+    | Beacon_port_hand
+    | Beacon_starboard_hand
+    | Beacon_preferred_channel_port_hand
+    | Beacon_preferred_channel_starboard_hand
+    | Beacon_isolated_danger
+    | Beacon_safe_water
+    | Beacon_special_mark
+    | Cardinal_mark_N
+    | Cardinal_mark_E
+    | Cardinal_mark_S
+    | Cardinal_mark_W
+    | Port_hand_mark
+    | Starboard_hand_mark
+    | Preferred_channel_port_hand
+    | Preferred_channel_starboard_hand
+    | Isolated_danger
+    | Safe_water
+    | Special_mark
+    | Light_vessel
+    [@@deriving enum, show]
+
+(* Type 21 *)
+type aid_to_navigation_report = {
+    aid_type: aid_type;
+    name: string;
+    position_accuracy: bool;
+    location: Coord.t option;
+    to_bow: int;
+    to_stern: int;
+    to_port: int;
+    to_starboard: int;
+    position_fix_type: position_fix_type;
+    second: int option;
+    off_position: bool;
+    raim_flag : bool;
+    virtual_aid: bool;
+    assigned: bool;
 }
 
 type message_type =
@@ -278,7 +346,9 @@ type message =
     | Base_station_report of base_station_report
     | Static_and_voyage_related_data of static_and_voyage_related_data
     | Standard_SAR_aircraft_position_report of standard_sar_aircraft_position_report
+    | Interrogation of ais_interrogation
     | Standard_class_b_CS_position_report of standard_class_b_cs_position_report
+    | Aid_to_navigation_report of aid_to_navigation_report
     | Unprocessed of message_type
 
 type t = {

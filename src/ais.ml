@@ -219,10 +219,25 @@ type standard_sar_aircraft_position_report = {
     radio_status: int;
 }
 
+(* Type 15 *)
+type ais_interrogation = {
+    first_interrogated_mmsi: int;
+    first_message_type: int;
+    first_slot_offset: int;
+    second_message_type: int;
+    second_slot_offset: int;
+
+    second_interrogated_mmsi: int;
+    third_message_type: int;
+    third_slot_offset: int;
+}
+
+
 type cs_unit =
     | Class_B_SOTDMA
     | Class_B_CS
 
+(* Type 18 *)
 type standard_class_b_cs_position_report = {
     speed_over_ground: float option;
     position_accuracy: bool;
@@ -238,6 +253,59 @@ type standard_class_b_cs_position_report = {
     assigned: bool;
     raim_flag : bool;
     radio_status: int;
+}
+
+type aid_type =
+    | Unspecified
+    | Reference_point
+    | RACON
+    | Fixed_structure
+    | Reserved
+    | Light_without_sectors
+    | Light_with_sectors
+    | Leading_light_from
+    | Leading_light_rear
+    | Beacon_N
+    | Beacon_E
+    | Beacon_S
+    | Beacon_W
+    | Beacon_port_hand
+    | Beacon_starboard_hand
+    | Beacon_preferred_channel_port_hand
+    | Beacon_preferred_channel_starboard_hand
+    | Beacon_isolated_danger
+    | Beacon_safe_water
+    | Beacon_special_mark
+    | Cardinal_mark_N
+    | Cardinal_mark_E
+    | Cardinal_mark_S
+    | Cardinal_mark_W
+    | Port_hand_mark
+    | Starboard_hand_mark
+    | Preferred_channel_port_hand
+    | Preferred_channel_starboard_hand
+    | Isolated_danger
+    | Safe_water
+    | Special_mark
+    | Light_vessel
+    [@@deriving enum, show]
+
+(* Type 21 *)
+type aid_to_navigation_report = {
+    aid_type: aid_type;
+    name: string;
+    position_accuracy: bool;
+    location: Coord.t option;
+    to_bow: int;
+    to_stern: int;
+    to_port: int;
+    to_starboard: int;
+    position_fix_type: position_fix_type;
+    second: int option;
+    off_position: bool;
+    raim_flag : bool;
+    virtual_aid: bool;
+    assigned: bool;
 }
 
 type message_type =
@@ -278,7 +346,9 @@ type message =
     | Base_station_report of base_station_report
     | Static_and_voyage_related_data of static_and_voyage_related_data
     | Standard_SAR_aircraft_position_report of standard_sar_aircraft_position_report
+    | Interrogation of ais_interrogation
     | Standard_class_b_CS_position_report of standard_class_b_cs_position_report
+    | Aid_to_navigation_report of aid_to_navigation_report
     | Unprocessed of message_type
 
 type t = {
@@ -287,6 +357,7 @@ type t = {
     mmsi : int;
     message : message;
 }
+
 
 let decode_armoured_char c =
     let v = (Char.code c) - 48 in
@@ -301,24 +372,27 @@ type signed =
     | Unsigned
     | Signed
 
-let get_bits payload _padding signed offset length =
+let get_bits payload padding signed offset length =
     if length < 1 || length > 63 then invalid_arg "Invalid length value";
+
+    let payload_length = Array.length payload in
 
     let rec loop acc offset bits =
         let char_index = Int.fdiv offset 6 in
         if char_index >= (Array.length payload) then invalid_arg "Offset too large";
         let char_offset = Int.rem offset 6 in
+        if char_index = (payload_length - 1) then
+            if char_offset > padding then
+            invalid_arg "Offset too large"
+        ;
 
         let bits_available = 6 - char_offset in
         let bits_to_read = Int.min bits_available bits in
         let mask = (1 lsl bits_to_read) - 1 in
 
-
-
         let v = payload.(char_index) in
         let v = (v lsr (6 - (char_offset + bits_to_read))) in
         let v = v land mask in
-
 
         let acc = (Int.shift_left acc bits_to_read) + v in
         let remaining = bits - bits_to_read in
@@ -687,6 +761,59 @@ let decoode_class_b_cs_position_report payload padding =
         radio_status;
     }
 
+let decode_aid_to_navigation payload padding =
+    let get_bits = get_bits payload padding in
+    let aid_type_raw = get_bits Unsigned 38 5 in
+    let name_raw = get_text payload padding 43 120 in
+    let position_accuracy = match (get_bits Unsigned 163 1) with 1 -> true | _ -> false in
+    let longitude_raw = get_bits Signed 164 28 in
+    let latitude_raw = get_bits Signed 192 27 in
+    let to_bow = get_bits Unsigned 219 9 in
+    let to_stern = get_bits Unsigned 228 9 in
+    let to_port = get_bits Unsigned 237 6 in
+    let to_starboard = get_bits Unsigned 243 6 in
+    let position_fix_type = Option.get (position_fix_type_of_enum (get_bits Unsigned 249 4)) in
+    let second_raw = get_bits Unsigned 253 6 in
+    let off_position = match (get_bits Unsigned 259 1) with 1 -> true | _ -> false in
+    let raim_flag = match (get_bits Unsigned 268 1) with 1 -> true | _ -> false in
+    let virtual_aid = match (get_bits Unsigned 269 1) with 1 -> true | _ -> false in
+    let assigned = match (get_bits Unsigned 146 1) with 1 -> true | _ -> false in
+
+    let aid_type = Option.get (aid_type_of_enum aid_type_raw) in
+
+    let location = raw_lat_lng_to_coord longitude_raw latitude_raw in
+
+    let second = match second_raw with
+    | n when n < 0 -> invalid_arg "Failed to decode second"
+    | n when n < 60 -> Some n
+    | 60 -> None
+    | _ -> invalid_arg "Failed to decode second"
+    in
+
+    (* Todo: name extension *)
+    let extra_bits = (((Array.length payload) * 6) - padding) - 272 in
+    let name = if extra_bits <= 0 then name_raw else (
+        let name_extra = get_text payload padding 272 ((Int.fdiv extra_bits 6) * 6) in
+        name_raw ^ name_extra
+    ) in
+
+    {
+        aid_type;
+        name;
+        position_accuracy;
+        location;
+        to_bow;
+        to_stern;
+        to_port;
+        to_starboard;
+        position_fix_type;
+        second;
+        off_position;
+        raim_flag;
+        virtual_aid;
+        assigned;
+    }
+
 let time_stamp_to_string t =
     match t with
     | Time_stamp n -> Printf.sprintf "%d" n
@@ -732,6 +859,7 @@ let of_sentences sl  =
             | Static_and_voyage_related_data -> Static_and_voyage_related_data (decode_related_data binary_payload padding)
             | Standard_SAR_aircraft_position_report -> Standard_SAR_aircraft_position_report (decoode_standard_sar_aircraft_report binary_payload padding)
             | Standard_class_b_CS_position_report -> Standard_class_b_CS_position_report (decoode_class_b_cs_position_report binary_payload padding)
+            | Aid_to_navigation_report -> Aid_to_navigation_report (decode_aid_to_navigation binary_payload padding)
             | mt -> Unprocessed mt
         )
         in

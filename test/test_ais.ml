@@ -271,6 +271,99 @@ let test_simple_class_b_cs_position_report_message_sentinel_synthetic _ =
   )
   | _ -> assert false
 
+let test_aid_to_navigation_synthetic_1 _ =
+  let msg = "!AIVDM,1,1,,A,E>jFJ0LRd0V`62h1:WdhHP00000OpEAh?D:N010888b020,4*62" in
+  match Nmea.Parse.parse msg with
+  | VDM vdm -> (
+      assert_equal ~msg:"Check fragment" 1 vdm.fragment;
+      assert_equal ~msg:"Check fragmens" 1 vdm.fragments;
+      assert_equal ~msg:"Check id" None vdm.id;
+      assert_equal ~msg:"Check channel" Sentence.A vdm.channel;
+      assert_equal ~msg:"Check padding" 4 vdm.padding;
+
+      let ais = Ais.of_sentences ([vdm]) in
+      assert_equal ~msg:"Check channel" Sentence.A ais.channel;
+      assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
+      assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 992320001 ais.mmsi;
+
+      match ais.message with
+      | Aid_to_navigation_report msg -> (
+          assert_equal ~cmp:cmp_opt_loc ~printer:fmt_opt_loc ~msg:"Check location" (Some ((53.53, Coord.N), (3.35, Coord.W))) msg.location;
+          assert_equal ~printer:(fun x -> x) ~msg:"Check name" "EXAMPLE BUOY 1" msg.name;
+          assert_equal ~printer:fmt_opt_int ~msg:"Check second" (Some 20) msg.second;
+          assert_equal ~printer:Ais.show_aid_type ~msg:"Check type" Ais.Starboard_hand_mark msg.aid_type;
+          assert_equal ~printer:Int.to_string ~msg:"Check to bow" 1 msg.to_bow;
+          assert_equal ~printer:Int.to_string ~msg:"Check to stern" 1 msg.to_stern;
+          assert_equal ~printer:Int.to_string ~msg:"Check to port" 1 msg.to_port;
+          assert_equal ~printer:Int.to_string ~msg:"Check to starboard" 1 msg.to_starboard;
+          assert_equal ~msg:"Check virtual flag" false msg.virtual_aid;
+      )
+      | _ -> assert false
+  )
+  | _ -> assert false
+
+let test_aid_to_navigation_synthetic_2 _ =
+  let msg = "!AIVDM,1,1,,A,E>jFJ0b;4a::PV@7@6Pa5P00000Opc@0?ELP000000v030,4*6F" in
+  match Nmea.Parse.parse msg with
+  | VDM vdm -> (
+      assert_equal ~msg:"Check fragment" 1 vdm.fragment;
+      assert_equal ~msg:"Check fragmens" 1 vdm.fragments;
+      assert_equal ~msg:"Check id" None vdm.id;
+      assert_equal ~msg:"Check channel" Sentence.A vdm.channel;
+      assert_equal ~msg:"Check padding" 4 vdm.padding;
+
+      let ais = Ais.of_sentences ([vdm]) in
+      assert_equal ~msg:"Check channel" Sentence.A ais.channel;
+      assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
+      assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 992320002 ais.mmsi;
+
+      match ais.message with
+      | Aid_to_navigation_report msg -> (
+          assert_equal ~cmp:cmp_opt_loc ~printer:fmt_opt_loc ~msg:"Check location" (Some ((53.6, Coord.N), (3.2, Coord.W))) msg.location;
+          assert_equal ~printer:(fun x -> x) ~msg:"Check name" "VIRTUAL N MARK" msg.name;
+          assert_equal ~printer:fmt_opt_int ~msg:"Check second" None msg.second;
+          assert_equal ~printer:Ais.show_aid_type ~msg:"Check type" Ais.Cardinal_mark_N msg.aid_type;
+          assert_equal ~printer:Int.to_string ~msg:"Check to bow" 0 msg.to_bow;
+          assert_equal ~printer:Int.to_string ~msg:"Check to stern" 0 msg.to_stern;
+          assert_equal ~printer:Int.to_string ~msg:"Check to port" 0 msg.to_port;
+          assert_equal ~printer:Int.to_string ~msg:"Check to starboard" 0 msg.to_starboard;
+          assert_equal ~msg:"Check virtual flag" true msg.virtual_aid;
+      )
+      | _ -> assert false
+  )
+  | _ -> assert false
+
+let test_aid_to_navigation_synthetic_3 _ =
+  let msg = "!AIVDM,1,1,,A,E>jFJ0wVRa9Rdh10a@64ST:@;2awpLVP?Cvh0`50hhb024iC00,4*49" in
+  match Nmea.Parse.parse msg with
+  | VDM vdm -> (
+      assert_equal ~msg:"Check fragment" 1 vdm.fragment;
+      assert_equal ~msg:"Check fragmens" 1 vdm.fragments;
+      assert_equal ~msg:"Check id" None vdm.id;
+      assert_equal ~msg:"Check channel" Sentence.A vdm.channel;
+      assert_equal ~msg:"Check padding" 4 vdm.padding;
+
+      let ais = Ais.of_sentences ([vdm]) in
+      assert_equal ~msg:"Check channel" Sentence.A ais.channel;
+      assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
+      assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 992320003 ais.mmsi;
+
+      match ais.message with
+      | Aid_to_navigation_report msg -> (
+          assert_equal ~cmp:cmp_opt_loc ~printer:fmt_opt_loc ~msg:"Check location" (Some ((53.52, Coord.N), (3.3, Coord.W))) msg.location;
+          assert_equal ~printer:(fun x -> x) ~msg:"Check name" "MERSEY BAR LIGHT VESSEL" msg.name;
+          assert_equal ~printer:fmt_opt_int ~msg:"Check second" (Some 20) msg.second;
+          assert_equal ~printer:Ais.show_aid_type ~msg:"Check type" Ais.Light_vessel msg.aid_type;
+          assert_equal ~printer:Int.to_string ~msg:"Check to bow" 40 msg.to_bow;
+          assert_equal ~printer:Int.to_string ~msg:"Check to stern" 40 msg.to_stern;
+          assert_equal ~printer:Int.to_string ~msg:"Check to port" 6 msg.to_port;
+          assert_equal ~printer:Int.to_string ~msg:"Check to starboard" 6 msg.to_starboard;
+          assert_equal ~msg:"Check virtual flag" false msg.virtual_aid;
+      )
+      | _ -> assert false
+  )
+  | _ -> assert false
+
 let suite =
   "ais tests"
   >::: [
@@ -282,6 +375,9 @@ let suite =
          "Test SAR sentinel" >:: test_simple_sar_aircraft_message_sentinel_synthetic;
          "Test Class B CS report synthetic" >:: test_simple_class_b_cs_position_report_message_synthetic;
           "Test Class B CS report sentinel synthetic" >:: test_simple_class_b_cs_position_report_message_sentinel_synthetic;
+          "Test aid to navigation example 1" >:: test_aid_to_navigation_synthetic_1;
+          "Test aid to navigation example 2" >:: test_aid_to_navigation_synthetic_2;
+          "Test aid to navigation example 3" >:: test_aid_to_navigation_synthetic_3;
        ]
 
 let () = run_test_tt_main suite
