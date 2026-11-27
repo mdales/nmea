@@ -1,3 +1,5 @@
+open Payload
+
 exception Incomplete_message
 
 type navigation_status =
@@ -308,6 +310,34 @@ type aid_to_navigation_report = {
     assigned: bool;
 }
 
+(* Type 24 *)
+type static_data_report_b_aux = {
+    ship_type: ship_and_cargo_classification;
+    vendor_id: string;
+    model: int;
+    serial_number: int;
+    call_sign: string;
+    mothership_mmsi: int;
+}
+
+type static_data_report_b = {
+    ship_type: ship_and_cargo_classification;
+    vendor_id: string;
+    model: int;
+    serial_number: int;
+    call_sign: string;
+    to_bow: int;
+    to_stern: int;
+    to_port: int;
+    to_starboard: int;
+}
+
+type static_data_report =
+    | Part_a of string
+    | Part_b of static_data_report_b
+    | Part_b_aux of static_data_report_b_aux
+    | Unknown of int
+
 type message_type =
     | Invalid (* enumerations start at 1 *)
     | Position_report_class_a
@@ -349,6 +379,7 @@ type message =
     | Interrogation of ais_interrogation
     | Standard_class_b_CS_position_report of standard_class_b_cs_position_report
     | Aid_to_navigation_report of aid_to_navigation_report
+    | Static_data_report of static_data_report
     | Unprocessed of message_type
 
 type t = {
@@ -357,75 +388,6 @@ type t = {
     mmsi : int;
     message : message;
 }
-
-
-let decode_armoured_char c =
-    let v = (Char.code c) - 48 in
-    if v <= 40 then v else v  - 8
-
-let decode_payload payload_str=
-    let charlist = List.of_seq (String.to_seq payload_str) in
-    let six_bit_binary = List.map decode_armoured_char charlist in
-    Array.of_list six_bit_binary
-
-type signed =
-    | Unsigned
-    | Signed
-
-let get_bits payload padding signed offset length =
-    if length < 1 || length > 63 then invalid_arg "Invalid length value";
-
-    let payload_length = Array.length payload in
-
-    let rec loop acc offset bits =
-        let char_index = Int.fdiv offset 6 in
-        if char_index >= (Array.length payload) then invalid_arg "Offset too large";
-        let char_offset = Int.rem offset 6 in
-        if char_index = (payload_length - 1) then
-            if char_offset > padding then
-            invalid_arg "Offset too large"
-        ;
-
-        let bits_available = 6 - char_offset in
-        let bits_to_read = Int.min bits_available bits in
-        let mask = (1 lsl bits_to_read) - 1 in
-
-        let v = payload.(char_index) in
-        let v = (v lsr (6 - (char_offset + bits_to_read))) in
-        let v = v land mask in
-
-        let acc = (Int.shift_left acc bits_to_read) + v in
-        let remaining = bits - bits_to_read in
-        match remaining with
-        | 0 -> acc
-        | _ -> loop acc (offset + bits_to_read) remaining
-    in
-    let v = loop 0 offset length in
-
-    match signed with
-    | Unsigned -> v
-    | Signed -> (
-        (v lsl (Sys.int_size - length)) asr (Sys.int_size - length)
-    )
-
-let get_text payload padding offset length =
-    if (Int.rem length 6) <> 0 then invalid_arg "Expected length to be multiple of six";
-    let char_count = Int.fdiv length 6 in
-    let padded_string  = String.init char_count (fun i ->
-        let v = get_bits payload padding Unsigned (offset + (i * 6)) 6 in
-        if v < 32 then Char.chr (v + 64) else
-        Char.chr v
-    ) in
-    let rec loop i =
-        if i < 0 then 0 else (
-        let c = String.get padded_string i in
-        match c with
-        | '@' | ' ' -> loop (i - 1)
-        | _ -> i + 1
-        )
-    in
-    let final_pos = loop (char_count - 1) in
-    String.sub padded_string 0 final_pos
 
 let raw_lat_lng_to_coord longitude_raw latitude_raw =
     match longitude_raw, latitude_raw with
@@ -439,19 +401,19 @@ let raw_lat_lng_to_coord longitude_raw latitude_raw =
         Some (lat, lng)
     )
 
-let decoode_position_report payload padding =
-    let get_bits = get_bits payload padding in
+let decoode_position_report payload =
+    let get_bits = get_bits payload in
     let navigation_status = Option.get (navigation_status_of_enum (get_bits Unsigned 38 4)) in
     let rate_of_turn = get_bits Signed 42 8 in
     let speed_over_ground_raw = get_bits Unsigned 50 10 in
-    let position_accuracy = match (get_bits Unsigned 60 1) with 1 -> true | _ -> false in
+    let position_accuracy = get_bool payload 60 in
     let longitude_raw = get_bits Signed 61 28 in
     let latitude_raw = get_bits Signed 89 27 in
     let course_over_ground_raw = get_bits Unsigned 116 12 in
     let true_heading_raw = get_bits Unsigned 128 9 in
     let time_stamp_raw = get_bits Unsigned 137 6 in
     let maneuver_indicator = Option.get(maneuver_indicator_of_enum (get_bits Unsigned 143 2)) in
-    let raim_flag = match (get_bits Unsigned 148 1) with 1 -> true | _ -> false in
+    let raim_flag = get_bool payload 148 in
     let radio_status = get_bits Unsigned 149 19 in
 
     let speed_over_ground = match speed_over_ground_raw with
@@ -495,19 +457,19 @@ let decoode_position_report payload padding =
         radio_status;
     }
 
-let decode_base_station_report payload padding =
-    let get_bits = get_bits payload padding in
+let decode_base_station_report payload =
+    let get_bits = get_bits payload in
     let year_raw = get_bits Unsigned 38 14 in
     let month_raw = get_bits Unsigned 52 4 in
     let day_raw = get_bits Unsigned 56 5 in
     let hour_raw = get_bits Unsigned 61 5 in
     let minute_raw = get_bits Unsigned 66 6 in
     let second_raw = get_bits Unsigned 72 6 in
-    let fix_quality = match (get_bits Unsigned 78 1) with 1 -> true | _ -> false in
+    let fix_quality = get_bool payload 78 in
     let longitude_raw = get_bits Signed 79 28 in
     let latitude_raw = get_bits Signed 107 27 in
     let position_fix_type = Option.get (position_fix_type_of_enum (get_bits Unsigned 134 4)) in
-    let raim_flag = match (get_bits Unsigned 148 1) with 1 -> true | _ -> false in
+    let raim_flag = get_bool payload 148 in
     let radio_status = get_bits Unsigned 149 19 in
 
     let year = match year_raw with
@@ -568,12 +530,12 @@ let decode_base_station_report payload padding =
         radio_status;
     }
 
-let decode_related_data payload padding =
-    let get_bits = get_bits payload padding in
+let decode_related_data payload =
+    let get_bits = get_bits payload in
     let ais_version_raw = get_bits Unsigned 38 2 in
     let imo_number = get_bits Unsigned 40 30 in
-    let call_sign = get_text payload padding 70 42 in
-    let ship_name = get_text payload padding 112 120 in
+    let call_sign = get_text payload 70 42 in
+    let ship_name = get_text payload 112 120 in
     let ship_type = Option.get (ship_and_cargo_classification_of_enum (get_bits Unsigned 232 8)) in
     let to_bow = get_bits Unsigned 240 9 in
     let to_stern = get_bits Unsigned 249 9 in
@@ -585,8 +547,8 @@ let decode_related_data payload padding =
     let eta_hour_raw = get_bits Unsigned 283 5 in
     let eta_minute_raw = get_bits Unsigned 288 6 in
     let draught = (get_bits Unsigned 294 8) * 10 in
-    let destination = get_text payload padding 302 120 in
-    let dte = match get_bits Unsigned 422 1 with 1 -> true | _ -> false in
+    let destination = get_text payload 302 120 in
+    let dte = get_bool payload 422 in
 
     let ais_version = match ais_version_raw with
     | 0 -> ITU1371
@@ -642,19 +604,19 @@ let decode_related_data payload padding =
     }
 
 
-let decoode_standard_sar_aircraft_report payload padding =
-    let get_bits = get_bits payload padding in
+let decoode_standard_sar_aircraft_report payload =
+    let get_bits = get_bits payload in
     let altitude_raw = get_bits Unsigned 38 12 in
     let speed_over_ground_raw = get_bits Unsigned 50 10 in
-    let position_accuracy = match (get_bits Unsigned 60 1) with 1 -> true | _ -> false in
+    let position_accuracy = get_bool payload 60 in
     let longitude_raw = get_bits Signed 61 28 in
     let latitude_raw = get_bits Signed 89 27 in
     let course_over_ground_raw = get_bits Unsigned 116 12 in
     let time_stamp_raw = get_bits Unsigned 128 6 in
-    let dte = match (get_bits Unsigned 142 1) with 1 -> true | _ -> false in
-    let assigned = match (get_bits Unsigned 146 1) with 1 -> true | _ -> false in
+    let dte = get_bool payload 142 in
+    let assigned = get_bool payload 146 in
 
-    let raim_flag = match (get_bits Unsigned 148 1) with 1 -> true | _ -> false in
+    let raim_flag = get_bool payload 148 in
     let radio_status = get_bits Unsigned 149 19 in
 
     let altitude = match altitude_raw with
@@ -697,24 +659,24 @@ let decoode_standard_sar_aircraft_report payload padding =
         radio_status;
     }
 
-let decoode_class_b_cs_position_report payload padding =
-    let get_bits = get_bits payload padding in
+let decoode_class_b_cs_position_report payload =
+    let get_bits = get_bits payload in
     let speed_over_ground_raw = get_bits Unsigned 46 10 in
-    let position_accuracy = match (get_bits Unsigned 56 1) with 1 -> true | _ -> false in
+    let position_accuracy = get_bool payload 56 in
     let longitude_raw = get_bits Signed 57 28 in
     let latitude_raw = get_bits Signed 85 27 in
     let course_over_ground_raw = get_bits Unsigned 112 12 in
     let true_heading_raw = get_bits Unsigned 124 9 in
     let time_stamp_raw = get_bits Unsigned 133 6 in
     let cs_unit = match (get_bits Unsigned 141 1) with 1 -> Class_B_CS | _ -> Class_B_SOTDMA in
-    let display_flag = match (get_bits Unsigned 142 1) with 1 -> true | _ -> false in
-    let dsc_flag = match (get_bits Unsigned 143 1) with 1 -> true | _ -> false in
-    let band_flag = match (get_bits Unsigned 144 1) with 1 -> true | _ -> false in
-    let message_22_flag = match (get_bits Unsigned 145 1) with 1 -> true | _ -> false in
-    let assigned = match (get_bits Unsigned 146 1) with 1 -> true | _ -> false in
+    let display_flag = get_bool payload 142 in
+    let dsc_flag = get_bool payload 143 in
+    let band_flag = get_bool payload 144 in
+    let message_22_flag = get_bool payload 145 in
+    let assigned = get_bool payload 146 in
 
 
-    let raim_flag = match (get_bits Unsigned 147 1) with 1 -> true | _ -> false in
+    let raim_flag = get_bool payload 147 in
     let radio_status = get_bits Unsigned 148 20 in
 
     let speed_over_ground = match speed_over_ground_raw with
@@ -761,11 +723,11 @@ let decoode_class_b_cs_position_report payload padding =
         radio_status;
     }
 
-let decode_aid_to_navigation payload padding =
-    let get_bits = get_bits payload padding in
+let decode_aid_to_navigation payload =
+    let get_bits = get_bits payload in
     let aid_type_raw = get_bits Unsigned 38 5 in
-    let name_raw = get_text payload padding 43 120 in
-    let position_accuracy = match (get_bits Unsigned 163 1) with 1 -> true | _ -> false in
+    let name_raw = get_text payload 43 120 in
+    let position_accuracy = get_bool payload 163 in
     let longitude_raw = get_bits Signed 164 28 in
     let latitude_raw = get_bits Signed 192 27 in
     let to_bow = get_bits Unsigned 219 9 in
@@ -774,10 +736,10 @@ let decode_aid_to_navigation payload padding =
     let to_starboard = get_bits Unsigned 243 6 in
     let position_fix_type = Option.get (position_fix_type_of_enum (get_bits Unsigned 249 4)) in
     let second_raw = get_bits Unsigned 253 6 in
-    let off_position = match (get_bits Unsigned 259 1) with 1 -> true | _ -> false in
-    let raim_flag = match (get_bits Unsigned 268 1) with 1 -> true | _ -> false in
-    let virtual_aid = match (get_bits Unsigned 269 1) with 1 -> true | _ -> false in
-    let assigned = match (get_bits Unsigned 146 1) with 1 -> true | _ -> false in
+    let off_position = get_bool payload 259 in
+    let raim_flag = get_bool payload 268 in
+    let virtual_aid = get_bool payload 269 in
+    let assigned = get_bool payload 146 in
 
     let aid_type = Option.get (aid_type_of_enum aid_type_raw) in
 
@@ -791,9 +753,9 @@ let decode_aid_to_navigation payload padding =
     in
 
     (* Todo: name extension *)
-    let extra_bits = (((Array.length payload) * 6) - padding) - 272 in
+    let extra_bits = (Payload.length payload) - 272 in
     let name = if extra_bits <= 0 then name_raw else (
-        let name_extra = get_text payload padding 272 ((Int.fdiv extra_bits 6) * 6) in
+        let name_extra = get_text payload 272 ((Int.fdiv extra_bits 6) * 6) in
         name_raw ^ name_extra
     ) in
 
@@ -813,6 +775,59 @@ let decode_aid_to_navigation payload padding =
         virtual_aid;
         assigned;
     }
+
+let decode_static_data_report_b payload =
+    let ship_type = Option.get (ship_and_cargo_classification_of_enum (get_uint payload 40 8)) in
+    let vendor_id = get_text payload 48 18 in
+    let model = get_uint payload 66 4 in
+    let serial_number = get_uint payload 70 20 in
+    let call_sign = get_text payload 90 42 in
+    let to_bow = get_uint payload 132 9 in
+    let to_stern = get_uint payload 141 9 in
+    let to_port = get_uint payload 150 6 in
+    let to_starboard = get_uint payload 156 6 in
+
+    {
+        ship_type;
+        vendor_id;
+        model;
+        serial_number;
+        call_sign;
+        to_bow;
+        to_stern;
+        to_port;
+        to_starboard;
+    }
+
+let decode_static_data_report_b_aux payload =
+    let ship_type = Option.get (ship_and_cargo_classification_of_enum (get_uint payload 40 8)) in
+    let vendor_id = get_text payload 48 18 in
+    let model = get_uint payload 66 4 in
+    let serial_number = get_uint payload 70 20 in
+    let call_sign = get_text payload 90 42 in
+    let mothership_mmsi = get_uint payload 132 30 in
+
+    {
+        ship_type;
+        vendor_id;
+        model;
+        serial_number;
+        call_sign;
+        mothership_mmsi;
+    }
+
+let decode_static_data_report mmsi payload =
+    match (get_uint payload 38 2) with
+    | 0 -> (
+        Part_a (get_text payload 40 120)
+    )
+    | 1 -> (
+        let is_aux = (Int.fdiv mmsi 10000000) = 98 in
+        match is_aux with
+        | false -> Part_b (decode_static_data_report_b payload)
+        | true -> Part_b_aux (decode_static_data_report_b_aux payload)
+    )
+    | x -> Unknown x
 
 let time_stamp_to_string t =
     match t with
@@ -842,24 +857,25 @@ let of_sentences sl  =
 
         let payloads = List.map (fun a -> a.Sentence.payload) sl |> String.concat "" in
         let padding = List.fold_left (fun _ a -> a.Sentence.padding) 0 sl in
-        let binary_payload = decode_payload payloads in
+        let payload = Payload.v payloads padding in
 
-        let raw_mt = get_bits binary_payload padding Unsigned 0 6 in
-        let repeat = get_bits binary_payload padding Unsigned 6 2 in
-        let mmsi = get_bits binary_payload padding Unsigned 8 30 in
+        let raw_mt = get_bits payload Unsigned 0 6 in
+        let repeat = get_bits payload Unsigned 6 2 in
+        let mmsi = get_bits payload Unsigned 8 30 in
 
         let message = match message_type_of_enum raw_mt with
         | None -> invalid_arg "not a valid message"
         | Some mt ->  (
             match mt with
-            | Position_report_class_a -> Position_report_class_a (decoode_position_report binary_payload padding)
-            | Position_report_class_a_assigned_schedule -> Position_report_class_a_assigned_schedule (decoode_position_report binary_payload padding)
-            | Position_report_class_a_response_to_interrogation -> Position_report_class_a_response_to_interrogation (decoode_position_report binary_payload padding)
-            | Base_station_report -> Base_station_report (decode_base_station_report binary_payload padding)
-            | Static_and_voyage_related_data -> Static_and_voyage_related_data (decode_related_data binary_payload padding)
-            | Standard_SAR_aircraft_position_report -> Standard_SAR_aircraft_position_report (decoode_standard_sar_aircraft_report binary_payload padding)
-            | Standard_class_b_CS_position_report -> Standard_class_b_CS_position_report (decoode_class_b_cs_position_report binary_payload padding)
-            | Aid_to_navigation_report -> Aid_to_navigation_report (decode_aid_to_navigation binary_payload padding)
+            | Position_report_class_a -> Position_report_class_a (decoode_position_report payload)
+            | Position_report_class_a_assigned_schedule -> Position_report_class_a_assigned_schedule (decoode_position_report payload)
+            | Position_report_class_a_response_to_interrogation -> Position_report_class_a_response_to_interrogation (decoode_position_report payload)
+            | Base_station_report -> Base_station_report (decode_base_station_report payload)
+            | Static_and_voyage_related_data -> Static_and_voyage_related_data (decode_related_data payload)
+            | Standard_SAR_aircraft_position_report -> Standard_SAR_aircraft_position_report (decoode_standard_sar_aircraft_report payload)
+            | Standard_class_b_CS_position_report -> Standard_class_b_CS_position_report (decoode_class_b_cs_position_report payload)
+            | Aid_to_navigation_report -> Aid_to_navigation_report (decode_aid_to_navigation payload)
+            | Static_data_report -> Static_data_report (decode_static_data_report mmsi payload)
             | mt -> Unprocessed mt
         )
         in

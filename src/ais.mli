@@ -308,6 +308,34 @@ type aid_to_navigation_report = {
     assigned: bool;
 }
 
+(* Type 24 *)
+type static_data_report_b_aux = {
+    ship_type: ship_and_cargo_classification;
+    vendor_id: string;
+    model: int;
+    serial_number: int;
+    call_sign: string;
+    mothership_mmsi: int;
+}
+
+type static_data_report_b = {
+    ship_type: ship_and_cargo_classification;
+    vendor_id: string;
+    model: int;
+    serial_number: int;
+    call_sign: string;
+    to_bow: int;
+    to_stern: int;
+    to_port: int;
+    to_starboard: int;
+}
+
+type static_data_report =
+    | Part_a of string
+    | Part_b of static_data_report_b
+    | Part_b_aux of static_data_report_b_aux
+    | Unknown of int
+
 type message_type =
     | Invalid (* enumerations start at 1 *)
     | Position_report_class_a
@@ -349,6 +377,7 @@ type message =
     | Interrogation of ais_interrogation
     | Standard_class_b_CS_position_report of standard_class_b_cs_position_report
     | Aid_to_navigation_report of aid_to_navigation_report
+    | Static_data_report of static_data_report
     | Unprocessed of message_type
 
 type t = {

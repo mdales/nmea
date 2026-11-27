@@ -364,6 +364,129 @@ let test_aid_to_navigation_synthetic_3 _ =
   )
   | _ -> assert false
 
+let test_static_data_report_1 _ =
+  let msg = "!AIVDM,1,1,,B,H3P7@i0EP4m0hF1T4<Q@00000000,0*0E" in
+  match Nmea.Parse.parse msg with
+  | VDM vdm -> (
+      assert_equal ~msg:"Check fragment" 1 vdm.fragment;
+      assert_equal ~msg:"Check fragmens" 1 vdm.fragments;
+      assert_equal ~msg:"Check id" None vdm.id;
+      assert_equal ~msg:"Check channel" Sentence.B vdm.channel;
+      assert_equal ~msg:"Check padding" 0 vdm.padding;
+
+      let ais = Ais.of_sentences ([vdm]) in
+      assert_equal ~msg:"Check channel" Sentence.B ais.channel;
+      assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
+      assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 235000004 ais.mmsi;
+
+      match ais.message with
+      | Static_data_report msg -> (
+        match msg with
+        | Part_a name -> (
+          assert_equal ~printer:(fun x -> x) ~msg: "Check name" "EXAMPLE YACHT" name
+        )
+        | _ -> assert false
+      )
+      | _ -> assert false
+  )
+  | _ -> assert false
+
+let test_static_data_report_2 _ =
+  let msg = "!AIVDM,1,1,,B,H3P7@i4UDCD<30q=qDCD000h4220,0*2F" in
+  match Nmea.Parse.parse msg with
+  | VDM vdm -> (
+      assert_equal ~msg:"Check fragment" 1 vdm.fragment;
+      assert_equal ~msg:"Check fragmens" 1 vdm.fragments;
+      assert_equal ~msg:"Check id" None vdm.id;
+      assert_equal ~msg:"Check channel" Sentence.B vdm.channel;
+      assert_equal ~msg:"Check padding" 0 vdm.padding;
+
+      let ais = Ais.of_sentences ([vdm]) in
+      assert_equal ~msg:"Check channel" Sentence.B ais.channel;
+      assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
+      assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 235000004 ais.mmsi;
+
+      match ais.message with
+      | Static_data_report msg -> (
+        match msg with
+        | Part_b msg -> (
+          assert_equal ~printer:Ais.show_ship_and_cargo_classification ~msg:"Check ship type" Ais.Pleasure_craft msg.ship_type;
+          assert_equal ~printer:(fun x -> x) ~msg:"Check vendor id" "TST" msg.vendor_id;
+          assert_equal ~printer:Int.to_string ~msg:"Check model" 3 msg.model;
+          assert_equal ~printer:Int.to_string ~msg:"Check serial number" 12345 msg.serial_number;
+          assert_equal ~printer:(fun x -> x) ~msg:"Check call sign" "M9TST" msg.call_sign;
+          assert_equal ~printer:Int.to_string ~msg:"Check to bow" 6 msg.to_bow;
+          assert_equal ~printer:Int.to_string ~msg:"Check to stern" 4 msg.to_stern;
+          assert_equal ~printer:Int.to_string ~msg:"Check to port" 2 msg.to_port;
+          assert_equal ~printer:Int.to_string ~msg:"Check to starboard" 2 msg.to_starboard;
+        )
+        | _ -> assert false
+      )
+      | _ -> assert false
+  )
+  | _ -> assert false
+
+
+let test_static_data_report_3 _ =
+  let msg = "!AIVDM,1,1,,B,H>`l3PA@E=A<PU21@Dp@E8000000,0*77" in
+  match Nmea.Parse.parse msg with
+  | VDM vdm -> (
+      assert_equal ~msg:"Check fragment" 1 vdm.fragment;
+      assert_equal ~msg:"Check fragmens" 1 vdm.fragments;
+      assert_equal ~msg:"Check id" None vdm.id;
+      assert_equal ~msg:"Check channel" Sentence.B vdm.channel;
+      assert_equal ~msg:"Check padding" 0 vdm.padding;
+
+      let ais = Ais.of_sentences ([vdm]) in
+      assert_equal ~msg:"Check channel" Sentence.B ais.channel;
+      assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
+      assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 982320001 ais.mmsi;
+
+      match ais.message with
+      | Static_data_report msg -> (
+        match msg with
+        | Part_a name -> (
+          assert_equal ~printer:(fun x -> x) ~msg: "Check name" "TESTSHIP TENDER" name
+        )
+        | _ -> assert false
+      )
+      | _ -> assert false
+  )
+  | _ -> assert false
+
+let test_static_data_report_4 _ =
+  let msg = "!AIVDM,1,1,,B,H>`l3PDUDCD<30r=qD>400>0M3:0,0*5B" in
+  match Nmea.Parse.parse msg with
+  | VDM vdm -> (
+      assert_equal ~msg:"Check fragment" 1 vdm.fragment;
+      assert_equal ~msg:"Check fragmens" 1 vdm.fragments;
+      assert_equal ~msg:"Check id" None vdm.id;
+      assert_equal ~msg:"Check channel" Sentence.B vdm.channel;
+      assert_equal ~msg:"Check padding" 0 vdm.padding;
+
+      let ais = Ais.of_sentences ([vdm]) in
+      assert_equal ~msg:"Check channel" Sentence.B ais.channel;
+      assert_equal ~printer:Int.to_string ~msg:"Check repeats" 0 ais.repeat_indicator;
+      assert_equal ~printer:Int.to_string ~msg:"Check MMSI" 982320001 ais.mmsi;
+
+      match ais.message with
+      | Static_data_report msg -> (
+        match msg with
+        | Part_b_aux msg -> (
+          assert_equal ~printer:Ais.show_ship_and_cargo_classification ~msg:"Check ship type" Ais.Pleasure_craft msg.ship_type;
+          assert_equal ~printer:(fun x -> x) ~msg:"Check vendor id" "TST" msg.vendor_id;
+          assert_equal ~printer:Int.to_string ~msg:"Check model" 3 msg.model;
+          assert_equal ~printer:Int.to_string ~msg:"Check serial number" 12346 msg.serial_number;
+          assert_equal ~printer:(fun x -> x) ~msg:"Check call sign" "M9TND" msg.call_sign;
+          assert_equal ~printer:Int.to_string ~msg:"Check to mothership mmsi" 235000010 msg.mothership_mmsi;
+        )
+        | _ -> assert false
+      )
+      | _ -> assert false
+  )
+  | _ -> assert false
+
+
 let suite =
   "ais tests"
   >::: [
@@ -378,6 +501,10 @@ let suite =
           "Test aid to navigation example 1" >:: test_aid_to_navigation_synthetic_1;
           "Test aid to navigation example 2" >:: test_aid_to_navigation_synthetic_2;
           "Test aid to navigation example 3" >:: test_aid_to_navigation_synthetic_3;
+          "Test static data report 1" >:: test_static_data_report_1;
+          "Test static data report 2" >:: test_static_data_report_2;
+          "Test static data report 3" >:: test_static_data_report_3;
+          "Test static data report 4" >:: test_static_data_report_4;
        ]
 
 let () = run_test_tt_main suite
